@@ -3,27 +3,21 @@ import os
 import sys
 import json
 sys.path.append(os.path.abspath('../../'))
-from tasks.task_3.task_3 import DocumentProcessor
-from tasks.task_4.task_4 import EmbeddingClient
-from tasks.task_5.task_5 import ChromaCollectionCreator
+from task_3 import DocumentProcessor
+from task_4 import EmbeddingClient
+from task_5 import ChromaCollectionCreator
 
 from langchain_core.prompts import PromptTemplate
 from langchain_google_vertexai import VertexAI
+from langchain_core.vectorstores import VectorStoreRetriever
 
 class QuizGenerator:
     def __init__(self, topic=None, num_questions=1, vectorstore=None):
         """
         Initializes the QuizGenerator with a required topic, the number of questions for the quiz,
         and an optional vectorstore for querying related information.
-
-        :param topic: A string representing the required topic of the quiz.
-        :param num_questions: An integer representing the number of questions to generate for the quiz, up to a maximum of 10.
-        :param vectorstore: An optional vectorstore instance (e.g., ChromaDB) to be used for querying information related to the quiz topic.
         """
-        if not topic:
-            self.topic = "General Knowledge"
-        else:
-            self.topic = topic
+        self.topic = topic or "General Knowledge"
 
         if num_questions > 10:
             raise ValueError("Number of questions cannot exceed 10.")
@@ -31,7 +25,7 @@ class QuizGenerator:
 
         self.vectorstore = vectorstore
         self.llm = None
-        self.question_bank = [] # Initialize the question bank to store questions
+        self.question_bank = []  # Initialize the question bank to store questions
         self.system_template = """
             You are a subject matter expert on the topic: {topic}
             
@@ -60,23 +54,16 @@ class QuizGenerator:
     def init_llm(self):
         """
         Initializes and configures the Large Language Model (LLM) for generating quiz questions.
-
-        This method should handle any setup required to interact with the LLM, including authentication,
-        setting up any necessary parameters, or selecting a specific model.
-
-        :return: An instance or configuration for the LLM.
         """
         self.llm = VertexAI(
-            model_name = "gemini-pro",
-            temperature = 0.8, # Increased for less deterministic questions 
-            max_output_tokens = 500
+            model_name="gemini-pro",
+            temperature=0.8,  # Increased for less deterministic questions 
+            max_output_tokens=500
         )
 
     def generate_question_with_vectorstore(self):
         """
-        Generates a quiz question based on the topic provided using a vectorstore
-
-        :return: A JSON object representing the generated quiz question.
+        Generates a quiz question based on the topic provided using a vectorstore.
         """
         if not self.llm:
             self.init_llm()
@@ -105,73 +92,46 @@ class QuizGenerator:
 
     def generate_quiz(self) -> list:
         """
-        Task: Generate a list of unique quiz questions based on the specified topic and number of questions.
-
-        This method orchestrates the quiz generation process by utilizing the `generate_question_with_vectorstore` method to generate each question and the `validate_question` method to ensure its uniqueness before adding it to the quiz.
-
-        Steps:
-            1. Initialize an empty list to store the unique quiz questions.
-            2. Loop through the desired number of questions (`num_questions`), generating each question via `generate_question_with_vectorstore`.
-            3. For each generated question, validate its uniqueness using `validate_question`.
-            4. If the question is unique, add it to the quiz; if not, attempt to generate a new question (consider implementing a retry limit).
-            5. Return the compiled list of unique quiz questions.
-
-        Returns:
-        - A list of dictionaries, where each dictionary represents a unique quiz question generated based on the topic.
-
-        Note: This method relies on `generate_question_with_vectorstore` for question generation and `validate_question` for ensuring question uniqueness. Ensure `question_bank` is properly initialized and managed.
+        Generates a list of unique quiz questions based on the specified topic and number of questions.
         """
-        self.question_bank = [] # Reset the question bank
+        self.question_bank = []  # Reset the question bank
 
         for _ in range(self.num_questions):
-            ##### YOUR CODE HERE #####
-            question_str = # Use class method to generate question
-            
-            ##### YOUR CODE HERE #####
-            try:
-                # Convert the JSON String to a dictionary
-            except json.JSONDecodeError:
-                print("Failed to decode question JSON.")
-                continue  # Skip this iteration if JSON decoding fails
-            ##### YOUR CODE HERE #####
+            question_str = self.generate_question_with_vectorstore()  # Generate question string
 
-            ##### YOUR CODE HERE #####
+            # Debugging: Output the raw response from LLM
+            print("Raw response from LLM:", question_str)
+
+            try:
+                question = json.loads(question_str)  # Convert JSON string to dictionary
+            except json.JSONDecodeError:
+                print("Failed to decode question JSON. Raw response was:")
+                print(question_str)  # Print the raw response for debugging
+                continue  # Skip this iteration if JSON decoding fails
+
             # Validate the question using the validate_question method
             if self.validate_question(question):
                 print("Successfully generated unique question")
-                # Add the valid and unique question to the bank
+                self.question_bank.append(question)  # Add the valid and unique question to the bank
             else:
                 print("Duplicate or invalid question detected.")
-            ##### YOUR CODE HERE #####
 
         return self.question_bank
 
     def validate_question(self, question: dict) -> bool:
         """
-        Task: Validate a quiz question for uniqueness within the generated quiz.
-
-        This method checks if the provided question (as a dictionary) is unique based on its text content compared to previously generated questions stored in `question_bank`. The goal is to ensure that no duplicate questions are added to the quiz.
-
-        Steps:
-            1. Extract the question text from the provided dictionary.
-            2. Iterate over the existing questions in `question_bank` and compare their texts to the current question's text.
-            3. If a duplicate is found, return False to indicate the question is not unique.
-            4. If no duplicates are found, return True, indicating the question is unique and can be added to the quiz.
-
-        Parameters:
-        - question: A dictionary representing the generated quiz question, expected to contain at least a "question" key.
-
-        Returns:
-        - A boolean value: True if the question is unique, False otherwise.
-
-        Note: This method assumes `question` is a valid dictionary and `question_bank` has been properly initialized.
+        Validates a quiz question for uniqueness within the generated quiz.
         """
-        ##### YOUR CODE HERE #####
-        # Consider missing 'question' key as invalid in the dict object
-        # Check if a question with the same text already exists in the self.question_bank
-        ##### YOUR CODE HERE #####
-        return is_unique
+        question_text = question.get("question", "").strip()
 
+        if not question_text:
+            return False  # Consider missing 'question' key as invalid in the dict object
+
+        for existing_question in self.question_bank:
+            if existing_question.get("question", "").strip() == question_text:
+                return False  # Duplicate question found
+
+        return True  # Unique question
 
 # Test Generating the Quiz
 if __name__ == "__main__":
@@ -188,7 +148,7 @@ if __name__ == "__main__":
         processor = DocumentProcessor()
         processor.ingest_documents()
     
-        embed_client = EmbeddingClient(**embed_config) # Initialize from Task 4
+        embed_client = EmbeddingClient(**embed_config)  # Initialize from Task 4
     
         chroma_creator = ChromaCollectionCreator(processor, embed_client)
     
@@ -211,11 +171,10 @@ if __name__ == "__main__":
                 # Test the Quiz Generator
                 generator = QuizGenerator(topic_input, questions, chroma_creator)
                 question_bank = generator.generate_quiz()
-                question = question_bank[0]
 
     if question_bank:
         screen.empty()
         with st.container():
-            st.header("Generated Quiz Question: ")
+            st.header("Generated Quiz Questions: ")
             for question in question_bank:
                 st.write(question)
